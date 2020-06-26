@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 )
-import "github.com/chiefnoah/goalpost"
+import "github.com/ralfonso-directnic/goalpost"
 
 const eventQueueID = "event-queue"
 
