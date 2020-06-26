@@ -10,6 +10,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	 "runtime/debug"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -181,6 +182,13 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 //PushJob pushes a job to the queue and notifies workers
 // Job.ID is always overwritten
 func (q *Queue) PushJob(j *Job) (uint64, error) {
+    
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+        }
+    }()
+    
 	var jobID uint64
 	var errb error
 	
@@ -188,6 +196,7 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 	err := q.db.Update(func(tx *bolt.Tx) error {
     	
 		//b := tx.Bucket([]byte(jobsBucketName))
+	
 		
         b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
        
