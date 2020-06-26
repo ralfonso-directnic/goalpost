@@ -53,7 +53,7 @@ func Init(filepath string) (*Queue, error) {
 	q.db = db
 
 	//Create bucket for jobs if it doesn't already exist
-	db.Update(func(tx *bolt.Tx) error {
+	erru := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
@@ -66,6 +66,11 @@ func Init(filepath string) (*Queue, error) {
 		}
 		return nil
 	})
+	
+	if(erru!=nil){ 
+    	log.Printf("Unable to create buckets: %s", err)
+        return q,err
+	}
 
 	// Make notification channels
 	c := make(chan uint64, 1000) //TODO: channel probably isn't the best way to handle the queue buffer
@@ -173,6 +178,7 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 // Job.ID is always overwritten
 func (q *Queue) PushJob(j *Job) (uint64, error) {
 	var jobID uint64
+	
 	err := q.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(jobsBucketName))
 		jobID, _ = b.NextSequence()
