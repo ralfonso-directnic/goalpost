@@ -14,6 +14,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+
 const (
 	jobsBucketName          = "Jobs"
 	completedJobsBucketName = "CompletedJobs"
@@ -45,15 +46,18 @@ type Queue struct {
 //a Queue. If the  file cannot be opened r/w, an error is returned.
 func Init(filepath string) (*Queue, error) {
 	q := &Queue{ID: filepath, PollRate: time.Duration(500 * time.Millisecond)}
+
 	db, err := bolt.Open(filepath+".db", 0600, nil)
+	
 	if err != nil {
 		log.Print(err)
 		return nil, err
 	}
+	
 	q.db = db
 
 	//Create bucket for jobs if it doesn't already exist
-	erru := db.Update(func(tx *bolt.Tx) error {
+	erru := q.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
@@ -183,7 +187,13 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 	
 	err := q.db.Update(func(tx *bolt.Tx) error {
     	
-		b := tx.Bucket([]byte(jobsBucketName))
+		//b := tx.Bucket([]byte(jobsBucketName))
+		
+        b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+       
+        if errc != nil {
+					return fmt.Errorf("create bucket: %s", errc)
+		}
 		
 		jobID, errb = b.NextSequence()
 		
