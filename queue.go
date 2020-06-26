@@ -187,7 +187,7 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 		
 		jobID, errb = b.NextSequence()
 		
-		if(err!=nil){
+		if(errb!=nil){
     		
     		log.Println(errb)
     		return errb
