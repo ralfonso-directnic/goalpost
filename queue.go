@@ -178,7 +178,7 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 // Job.ID is always overwritten
 func (q *Queue) PushJob(j *Job) (uint64, error) {
 	var jobID uint64
-	
+	var errb error
 	
 	
 	err := q.db.Update(func(tx *bolt.Tx) error {
