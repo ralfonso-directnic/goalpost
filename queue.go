@@ -179,14 +179,27 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 func (q *Queue) PushJob(j *Job) (uint64, error) {
 	var jobID uint64
 	
+	
+	
 	err := q.db.Update(func(tx *bolt.Tx) error {
+    	
 		b := tx.Bucket([]byte(jobsBucketName))
-		jobID, _ = b.NextSequence()
+		
+		jobID, errb = b.NextSequence()
+		
+		if(err!=nil){
+    		
+    		log.Println(errb)
+    		return errb
+		}
+		
 		j.ID = jobID
 		log.Printf("Storing job %d for processing", jobID)
 		err := b.Put(intToByteArray(jobID), j.Bytes())
 		return err
 	})
+	
+	
 	if err != nil {
 		log.Printf("Unable to push job to queue: %s", err)
 		return 0, err
