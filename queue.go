@@ -10,8 +10,6 @@ import (
 	"log"
 	"sync"
 	"time"
-	 "runtime/debug"
-
 	bolt "go.etcd.io/bbolt"
 )
 

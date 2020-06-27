@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+    "log"
+    bolt "go.etcd.io/bbolt"
 )
 
 //JobStatus is a enumerated int representing the processing status of a Job
@@ -60,14 +62,16 @@ func (j *Job) Save() (bool,error){
 	err := db.Update(func(tx *bolt.Tx) error {
     	
 		//b := tx.Bucket([]byte(jobsBucketName))
+		var b *bolt.Bucket
+		var errc error
 		
 		if(j.Status==1){ 
     		
-    		b, errc := tx.CreateBucketIfNotExists([]byte(completedJobsBucketName))
+    		b, errc = tx.CreateBucketIfNotExists([]byte(completedJobsBucketName))
     		
         }else{
 		
-            b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+            b, errc = tx.CreateBucketIfNotExists([]byte(jobsBucketName))
         
         }
        
@@ -76,7 +80,7 @@ func (j *Job) Save() (bool,error){
 		}
 		
 
-		log.Printf("Storing job %d for processing", jobID)
+		
 		err := b.Put(intToByteArray(j.ID), j.Bytes())
 		return err
 	})
