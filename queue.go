@@ -246,7 +246,7 @@ func (q *Queue) GetJobByID(id uint64) (*Job, error) {
 	
 	
 	
-	if(job.ID!=id){
+	if(job.ID<1){
     	
     	err = errors.New("Job ID Not Found")
     	
