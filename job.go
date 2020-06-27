@@ -57,7 +57,7 @@ func (j *Job) Bytes() []byte {
 func (j *Job) Save() (bool,error){
     
 
-	var errb error
+	
 	
 	err := db.Update(func(tx *bolt.Tx) error {
     	
