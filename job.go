@@ -52,7 +52,7 @@ func (j *Job) Bytes() []byte {
 	return buffer.Bytes()
 }
 
-func (j *Job) Save() bool,error{
+func (j *Job) Save() (bool,error){
     
 
 	var errb error
