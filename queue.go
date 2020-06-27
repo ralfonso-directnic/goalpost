@@ -233,7 +233,9 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 //It first checks active jobs, if it doesn't find the bucket for active jobs
 //it searches in the completed jobs bucket.
 func (q *Queue) GetJobByID(id uint64) (*Job, error) {
+	
 	job, err := q.getJobInBucketByID(id, jobsBucketName)
+	
 	if err != nil {
 		return nil, err
 	}
@@ -241,6 +243,16 @@ func (q *Queue) GetJobByID(id uint64) (*Job, error) {
 		log.Printf("Job not found in active jobs bucket, checking complete")
 		job, err = q.getJobInBucketByID(id, completedJobsBucketName)
 	}
+	
+	
+	
+	if(job.ID!=id){
+    	
+    	err = errors.New("Job ID Not Found")
+    	
+	}
+	
+	
 	return job, err
 }
 
