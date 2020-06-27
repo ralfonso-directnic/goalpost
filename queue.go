@@ -54,6 +54,7 @@ func Init(filepath string) (*Queue, error) {
 		log.Print(err)
 		return nil, err
 	}
+
 	
 	q.db = db
 
@@ -192,6 +193,9 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 	var jobID uint64
 	var errb error
 	
+	
+	log.Println(q.db)
+	return 0,nil
 	
 	err := q.db.Update(func(tx *bolt.Tx) error {
     	
