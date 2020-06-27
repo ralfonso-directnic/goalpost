@@ -90,8 +90,6 @@ func (j *Job) Save() (bool,error){
 	return true, nil
 }
     
-    
-}
 
 //RecoverableWorkerError defines an error that a worker DoWork func
 //can return that indicates the message should be retried
