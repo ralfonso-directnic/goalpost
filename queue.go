@@ -48,7 +48,9 @@ type Queue struct {
 func Init(filepath string) (*Queue, error) {
 	q := &Queue{ID: filepath, PollRate: time.Duration(500 * time.Millisecond)}
 
-	db, err := bolt.Open(filepath+".db", 0600, nil)
+
+    var err error
+	db, err = bolt.Open(filepath+".db", 0600, nil)
 	
 	if err != nil {
 		log.Print(err)
