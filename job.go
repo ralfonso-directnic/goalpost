@@ -61,7 +61,15 @@ func (j *Job) Save() bool,error{
     	
 		//b := tx.Bucket([]byte(jobsBucketName))
 		
-        b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+		if(j.Status==1){ 
+    		
+    		b, errc := tx.CreateBucketIfNotExists([]byte(completedJobsBucketName))
+    		
+        }else{
+		
+            b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+        
+        }
        
         if errc != nil {
 					return fmt.Errorf("create bucket: %s", errc)
