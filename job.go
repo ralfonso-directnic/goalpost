@@ -52,6 +52,39 @@ func (j *Job) Bytes() []byte {
 	return buffer.Bytes()
 }
 
+func (j *Job) Save() bool,error{
+    
+
+	var errb error
+	
+	err := db.Update(func(tx *bolt.Tx) error {
+    	
+		//b := tx.Bucket([]byte(jobsBucketName))
+		
+        b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+       
+        if errc != nil {
+					return fmt.Errorf("create bucket: %s", errc)
+		}
+		
+
+		log.Printf("Storing job %d for processing", jobID)
+		err := b.Put(intToByteArray(j.ID), j.Bytes())
+		return err
+	})
+	
+	
+	if err != nil {
+		log.Printf("Unable to push job to store: %s", err)
+		return false, err
+	}
+	
+	return true, nil
+}
+    
+    
+}
+
 //RecoverableWorkerError defines an error that a worker DoWork func
 //can return that indicates the message should be retried
 type RecoverableWorkerError struct {

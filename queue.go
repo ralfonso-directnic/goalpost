@@ -16,6 +16,8 @@ import (
 )
 
 
+var db *bolt.DB
+
 const (
 	jobsBucketName          = "Jobs"
 	completedJobsBucketName = "CompletedJobs"
@@ -184,11 +186,7 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 // Job.ID is always overwritten
 func (q *Queue) PushJob(j *Job) (uint64, error) {
     
-    defer func() {
-        if r := recover(); r != nil {
-            fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
-        }
-    }()
+
     
 	var jobID uint64
 	var errb error
@@ -229,6 +227,8 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 	return jobID, nil
 }
 
+
+
 //GetJobByID returns a pointer to a Job based on the primary key identifier id
 //It first checks active jobs, if it doesn't find the bucket for active jobs
 //it searches in the completed jobs bucket.
@@ -246,7 +246,7 @@ func (q *Queue) GetJobByID(id uint64) (*Job, error) {
 	
 	
 	
-	if(job.ID<1){
+	if(job == nil){
     	
     	err = errors.New("Job ID Not Found")
     	
