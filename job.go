@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-    "log"
-    bolt "go.etcd.io/bbolt"
+	bolt "go.etcd.io/bbolt"
+	"log"
+	"time"
 )
 
 //JobStatus is a enumerated int representing the processing status of a Job
@@ -34,6 +35,10 @@ type Job struct {
 	//Message is primarily used for debugging. It conatains status info
 	//about what was last done with the job.
 	Message string
+
+	Started time.Time
+
+	Finished time.Time
 }
 
 //DecodeJob decodes a gob encoded byte array into a Job struct and returns a pointer to it
@@ -54,46 +59,39 @@ func (j *Job) Bytes() []byte {
 	return buffer.Bytes()
 }
 
-func (j *Job) Save() (bool,error){
-    
+func (j *Job) Save() (bool, error) {
 
-	
-	
 	err := db.Update(func(tx *bolt.Tx) error {
-    	
+
 		//b := tx.Bucket([]byte(jobsBucketName))
 		var b *bolt.Bucket
 		var errc error
-		
-		if(j.Status==1){ 
-    		
-    		b, errc = tx.CreateBucketIfNotExists([]byte(completedJobsBucketName))
-    		
-        }else{
-		
-            b, errc = tx.CreateBucketIfNotExists([]byte(jobsBucketName))
-        
-        }
-       
-        if errc != nil {
-					return fmt.Errorf("create bucket: %s", errc)
-		}
-		
 
-		
+		if j.Status == 1 {
+
+			b, errc = tx.CreateBucketIfNotExists([]byte(completedJobsBucketName))
+
+		} else {
+
+			b, errc = tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+
+		}
+
+		if errc != nil {
+			return fmt.Errorf("create bucket: %s", errc)
+		}
+
 		err := b.Put(intToByteArray(j.ID), j.Bytes())
 		return err
 	})
-	
-	
+
 	if err != nil {
 		log.Printf("Unable to push job to store: %s", err)
 		return false, err
 	}
-	
+
 	return true, nil
 }
-    
 
 //RecoverableWorkerError defines an error that a worker DoWork func
 //can return that indicates the message should be retried

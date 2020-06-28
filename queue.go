@@ -7,12 +7,11 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	bolt "go.etcd.io/bbolt"
 	"log"
 	"sync"
 	"time"
-	bolt "go.etcd.io/bbolt"
 )
-
 
 var db *bolt.DB
 
@@ -48,16 +47,14 @@ type Queue struct {
 func Init(filepath string) (*Queue, error) {
 	q := &Queue{ID: filepath, PollRate: time.Duration(500 * time.Millisecond)}
 
-
-    var err error
+	var err error
 	db, err = bolt.Open(filepath+".db", 0600, nil)
-	
+
 	if err != nil {
 		log.Print(err)
 		return nil, err
 	}
 
-	
 	q.db = db
 
 	//Create bucket for jobs if it doesn't already exist
@@ -74,10 +71,10 @@ func Init(filepath string) (*Queue, error) {
 		}
 		return nil
 	})
-	
-	if(erru!=nil){ 
-    	log.Printf("Unable to create buckets: %s", err)
-        return q,err
+
+	if erru != nil {
+		log.Printf("Unable to create buckets: %s", err)
+		return q, err
 	}
 
 	// Make notification channels
@@ -185,40 +182,35 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 //PushJob pushes a job to the queue and notifies workers
 // Job.ID is always overwritten
 func (q *Queue) PushJob(j *Job) (uint64, error) {
-    
 
-    
 	var jobID uint64
 	var errb error
-	
 
-	
 	err := q.db.Update(func(tx *bolt.Tx) error {
-    	
+
 		//b := tx.Bucket([]byte(jobsBucketName))
-	
-		
-        b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
-       
-        if errc != nil {
-					return fmt.Errorf("create bucket: %s", errc)
+
+		b, errc := tx.CreateBucketIfNotExists([]byte(jobsBucketName))
+
+		if errc != nil {
+			return fmt.Errorf("create bucket: %s", errc)
 		}
-		
+
 		jobID, errb = b.NextSequence()
-		
-		if(errb!=nil){
-    		
-    		log.Println(errb)
-    		return errb
+
+		if errb != nil {
+
+			log.Println(errb)
+			return errb
 		}
-		
+
 		j.ID = jobID
+		j.Started = time.Now()
 		log.Printf("Storing job %d for processing", jobID)
 		err := b.Put(intToByteArray(jobID), j.Bytes())
 		return err
 	})
-	
-	
+
 	if err != nil {
 		log.Printf("Unable to push job to queue: %s", err)
 		return 0, err
@@ -227,15 +219,13 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 	return jobID, nil
 }
 
-
-
 //GetJobByID returns a pointer to a Job based on the primary key identifier id
 //It first checks active jobs, if it doesn't find the bucket for active jobs
 //it searches in the completed jobs bucket.
 func (q *Queue) GetJobByID(id uint64) (*Job, error) {
-	
+
 	job, err := q.getJobInBucketByID(id, jobsBucketName)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -243,16 +233,13 @@ func (q *Queue) GetJobByID(id uint64) (*Job, error) {
 		log.Printf("Job not found in active jobs bucket, checking complete")
 		job, err = q.getJobInBucketByID(id, completedJobsBucketName)
 	}
-	
-	
-	
-	if(job == nil){
-    	
-    	err = errors.New("Job ID Not Found")
-    	
+
+	if job == nil {
+
+		err = errors.New("Job ID Not Found")
+
 	}
-	
-	
+
 	return job, err
 }
 
@@ -283,9 +270,11 @@ func (q *Queue) updateJobStatus(id uint64, status JobStatus, message string) err
 		job := DecodeJob(jobBytes)
 		job.Status = status
 		job.Message = message
+
 		// Move the job to the "completed" bucket if it's failed or Acked
 		if status == Ack || status == Failed {
 			log.Printf("Job is complete or failed. Moving to completed jobs bucket")
+			job.Finished = time.Now()
 			err := completedJobsBucket.Put(intToByteArray(id), job.Bytes())
 			if err != nil {
 				log.Printf("Unable to add job %d to completedJobsBucket: ", err)
