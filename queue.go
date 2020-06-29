@@ -287,6 +287,13 @@ func (q *Queue) Status() (QueueStatus) {
     
     if(err!=nil){}
     
+    if(queue_status.Waiting>0) {
+    
+    queue_status.Waiting = queue_status.Waiting - queue_status.InProgress
+    
+    }
+    
+    
     return queue_status 
 	
 }
