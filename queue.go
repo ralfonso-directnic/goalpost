@@ -263,6 +263,8 @@ func (q *Queue) Status() (QueueStatus) {
     	
     		b := tx.Bucket([]byte(jobsBucketName))
 
+            queue_status.Waiting=0
+ 
         	b.ForEach(func(k, v []byte) error {
         		queue_status.Waiting++
         		return nil
@@ -270,6 +272,8 @@ func (q *Queue) Status() (QueueStatus) {
         	
             c := tx.Bucket([]byte(completedJobsBucketName))
 
+            queue_status.Completed=0
+            
         	c.ForEach(func(k, v []byte) error {
         		queue_status.Completed++
         		return nil
