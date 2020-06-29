@@ -14,6 +14,7 @@ import (
 )
 
 var db *bolt.DB
+var queue_status QueueStatus
 
 const (
 	jobsBucketName          = "Jobs"
@@ -39,6 +40,12 @@ type Queue struct {
 	//queue for jobs again.
 	//Default: 500 milliseconds
 	PollRate time.Duration
+}
+
+type QueueStatus struct {
+    Completed int
+    Waiting int
+    InProgress int
 }
 
 //Init creates a connection to the internal database and initializes the Queue type
@@ -137,20 +144,25 @@ func (q *Queue) registerWorkerWithContext(ctx context.Context, w Worker) {
 					continue
 				}
 				// Call the worker func handling this job
+				queue_status.InProgress++
 				err = w.DoWork(ctx, job)
+				
 				if err != nil {
 					_, ok := err.(RecoverableWorkerError)
 					if ok {
 						//temporary error, retry
 						log.Printf("Received temporary error: %s. Retrying...", err.Error())
 						q.updateJobStatus(jobID, Nack, err.Error())
+						queue_status.InProgress--
 					} else {
 						log.Printf("Permanent error received from worker: %s", err)
 						//permanent error, mark as failed
 						q.updateJobStatus(jobID, Failed, err.Error())
+						queue_status.InProgress--
 					}
 				} else {
 					q.updateJobStatus(jobID, Ack, "Complete")
+					queue_status.InProgress--
 				}
 				log.Printf("Finished processing job %d", jobID)
 			default:
@@ -241,6 +253,38 @@ func (q *Queue) GetJobByID(id uint64) (*Job, error) {
 	}
 
 	return job, err
+}
+
+func (q *Queue) Status() (QueueStatus) {
+
+
+
+	err := q.db.View(func(tx *bolt.Tx) error { 
+    	
+    		b := tx.Bucket([]byte(jobsBucketName))
+
+        	b.ForEach(func(k, v []byte) error {
+        		queue_status.Waiting++
+        		return nil
+        	})
+        	
+            c := tx.Bucket([]byte(completedJobsBucketName))
+
+        	c.ForEach(func(k, v []byte) error {
+        		queue_status.Completed++
+        		return nil
+        	})
+        	
+        	return nil
+        	
+        	
+    })
+    
+    
+    if(err!=nil){}
+    
+    return queue_status 
+	
 }
 
 func (q *Queue) getJobInBucketByID(id uint64, bucketName string) (*Job, error) {
