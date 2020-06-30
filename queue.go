@@ -11,6 +11,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	"github.com/rs/xid"
 )
 
 var db *bolt.DB
@@ -28,7 +29,7 @@ type Queue struct {
 	//db represents a handle to a bolt db
 	db *bolt.DB
 	//notifier is a chan used to signal workers there is a job to begin working
-	notifier chan uint64
+	notifier chan string
 	//workeres is a list of *Workers
 	workers []*Worker
 	//shutdownFuncs are context.CancleFuncs used to signal graceful shutdown
@@ -85,7 +86,7 @@ func Init(filepath string) (*Queue, error) {
 	}
 
 	// Make notification channels
-	c := make(chan uint64, 1000) //TODO: channel probably isn't the best way to handle the queue buffer
+	c := make(chan string, 1000) //TODO: channel probably isn't the best way to handle the queue buffer
 	q.notifier = c
 	q.workers = make([]*Worker, 0)
 	q.shutdownFuncs = make([]context.CancelFunc, 0)
@@ -120,7 +121,7 @@ func (q *Queue) registerWorkerWithContext(ctx context.Context, w Worker) {
 	//The big __main loop__ for workers.
 	go func() {
 		log.Printf("Starting up new worker...")
-		var jobID uint64
+		var jobID string
 		for {
 			// receive a notification from the queue chan
 			select {
@@ -182,7 +183,7 @@ func (q *Queue) RegisterWorker(w Worker) {
 }
 
 //PushBytes wraps arbitrary binary data in a job and pushes it onto the queue
-func (q *Queue) PushBytes(d []byte) (uint64, error) {
+func (q *Queue) PushBytes(d []byte) (string, error) {
 	job := &Job{
 		Status:     Uack,
 		Data:       d,
@@ -193,10 +194,10 @@ func (q *Queue) PushBytes(d []byte) (uint64, error) {
 
 //PushJob pushes a job to the queue and notifies workers
 // Job.ID is always overwritten
-func (q *Queue) PushJob(j *Job) (uint64, error) {
+func (q *Queue) PushJob(j *Job) (string, error) {
 
-	var jobID uint64
-	var errb error
+	var jobID string
+
 
 	err := q.db.Update(func(tx *bolt.Tx) error {
 
@@ -206,26 +207,22 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 
 		if errc != nil {
 			return fmt.Errorf("create bucket: %s", errc)
-		}
-
-		jobID, errb = b.NextSequence()
-
-		if errb != nil {
-
-			log.Println(errb)
-			return errb
-		}
+		}	
+		
+		guid := xid.New()
+		
+		jobID = guid.String()
 
 		j.ID = jobID
 		j.Started = time.Now()
 		log.Printf("Storing job %d for processing", jobID)
-		err := b.Put(intToByteArray(jobID), j.Bytes())
+		err := b.Put(stringToByteArray(jobID), j.Bytes())
 		return err
 	})
 
 	if err != nil {
 		log.Printf("Unable to push job to queue: %s", err)
-		return 0, err
+		return "", err
 	}
 	q.notifier <- jobID
 	return jobID, nil
@@ -234,7 +231,7 @@ func (q *Queue) PushJob(j *Job) (uint64, error) {
 //GetJobByID returns a pointer to a Job based on the primary key identifier id
 //It first checks active jobs, if it doesn't find the bucket for active jobs
 //it searches in the completed jobs bucket.
-func (q *Queue) GetJobByID(id uint64) (*Job, error) {
+func (q *Queue) GetJobByID(id string) (*Job, error) {
 
 	job, err := q.getJobInBucketByID(id, jobsBucketName)
 
@@ -298,14 +295,14 @@ func (q *Queue) Status() (QueueStatus) {
 	
 }
 
-func (q *Queue) getJobInBucketByID(id uint64, bucketName string) (*Job, error) {
+func (q *Queue) getJobInBucketByID(id string, bucketName string) (*Job, error) {
 	var job *Job
 	err := q.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
 			return errors.New("Invalid bucket")
 		}
-		jobBytes := b.Get(intToByteArray(id))
+		jobBytes := b.Get(stringToByteArray(id))
 		if jobBytes == nil {
 			log.Printf("Unknown key: %d", id)
 			return nil
@@ -317,11 +314,11 @@ func (q *Queue) getJobInBucketByID(id uint64, bucketName string) (*Job, error) {
 }
 
 //updateJobStatus updates the processing status of a job
-func (q *Queue) updateJobStatus(id uint64, status JobStatus, message string) error {
+func (q *Queue) updateJobStatus(id string, status JobStatus, message string) error {
 	err := q.db.Update(func(tx *bolt.Tx) error {
 		jobsBucket := tx.Bucket([]byte(jobsBucketName))
 		completedJobsBucket := tx.Bucket([]byte(completedJobsBucketName))
-		jobBytes := jobsBucket.Get(intToByteArray(id))
+		jobBytes := jobsBucket.Get(stringToByteArray(id))
 		job := DecodeJob(jobBytes)
 		job.Status = status
 		job.Message = message
@@ -330,26 +327,26 @@ func (q *Queue) updateJobStatus(id uint64, status JobStatus, message string) err
 		if status == Ack || status == Failed {
 			log.Printf("Job is complete or failed. Moving to completed jobs bucket")
 			job.Finished = time.Now()
-			err := completedJobsBucket.Put(intToByteArray(id), job.Bytes())
+			err := completedJobsBucket.Put(stringToByteArray(id), job.Bytes())
 			if err != nil {
 				log.Printf("Unable to add job %d to completedJobsBucket: ", err)
 				// Don't return this, it's non-fatal
 			}
 			// remove the job from the 'active' bucket
-			err = jobsBucket.Delete(intToByteArray(id))
+			err = jobsBucket.Delete(stringToByteArray(id))
 			if err != nil {
 				log.Printf("Unable to remove job from activie jobs bucket: %s", err)
 			}
 		} else if status == Nack {
 			job.RetryCount = job.RetryCount + 1
 			log.Printf("Nack: retry count: %d", job.RetryCount)
-			err := jobsBucket.Put(intToByteArray(id), job.Bytes())
+			err := jobsBucket.Put(stringToByteArray(id), job.Bytes())
 			if err != nil {
 				log.Printf("Unable to update job in active jobs bucket: %s", err)
 				return err
 			}
 		} else {
-			err := jobsBucket.Put(intToByteArray(id), job.Bytes())
+			err := jobsBucket.Put(stringToByteArray(id), job.Bytes())
 			if err != nil {
 				log.Printf("Unable to update job in active jobs bucket: %s", err)
 				return err
@@ -389,7 +386,12 @@ func (q *Queue) resumeUnackedJobs() error {
 	})
 }
 
-//intToByteArray small helper function for dealing with bucket record IDs
+func stringToByteArray(s string) []byte {
+	return []byte(s)
+}
+
+
+//stringToByteArray small helper function for dealing with bucket record IDs
 func intToByteArray(i uint64) []byte {
 	bs := make([]byte, 8)
 	binary.BigEndian.PutUint64(bs, i)

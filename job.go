@@ -24,7 +24,7 @@ const (
 type Job struct {
 	Status JobStatus
 	//Unique identifier for a Job
-	ID uint64
+	ID string
 	//Data contains the bytes that were pushed using Queue.PushBytes()
 	Data []byte
 	//RetryCount is the number of times the job has been retried
@@ -81,7 +81,7 @@ func (j *Job) Save() (bool, error) {
 			return fmt.Errorf("create bucket: %s", errc)
 		}
 
-		err := b.Put(intToByteArray(j.ID), j.Bytes())
+		err := b.Put(stringToByteArray(j.ID), j.Bytes())
 		return err
 	})
 
