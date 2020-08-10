@@ -299,7 +299,7 @@ func (q *Queue) All(getall bool) []QueueRow {
 
 	var all []QueueRow
 
-	err := q.db.View(func(tx *bolt.Tx) error {
+	q.db.View(func(tx *bolt.Tx) error {
 
 		b := tx.Bucket([]byte(jobsBucketName))
 
