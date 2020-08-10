@@ -7,11 +7,11 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"github.com/rs/xid"
 	bolt "go.etcd.io/bbolt"
 	"log"
 	"sync"
 	"time"
-	"github.com/rs/xid"
 )
 
 var db *bolt.DB
@@ -44,9 +44,14 @@ type Queue struct {
 }
 
 type QueueStatus struct {
-    Completed int
-    Waiting int
-    InProgress int
+	Completed  int
+	Waiting    int
+	InProgress int
+}
+
+type QueueRow struct {
+	Bucket string
+	Job    *Job
 }
 
 //Init creates a connection to the internal database and initializes the Queue type
@@ -147,7 +152,7 @@ func (q *Queue) registerWorkerWithContext(ctx context.Context, w Worker) {
 				// Call the worker func handling this job
 				queue_status.InProgress++
 				err = w.DoWork(ctx, job)
-				
+
 				if err != nil {
 					_, ok := err.(RecoverableWorkerError)
 					if ok {
@@ -198,7 +203,6 @@ func (q *Queue) PushJob(j *Job) (string, error) {
 
 	var jobID string
 
-
 	err := q.db.Update(func(tx *bolt.Tx) error {
 
 		//b := tx.Bucket([]byte(jobsBucketName))
@@ -207,10 +211,10 @@ func (q *Queue) PushJob(j *Job) (string, error) {
 
 		if errc != nil {
 			return fmt.Errorf("create bucket: %s", errc)
-		}	
-		
+		}
+
 		guid := xid.New()
-		
+
 		jobID = guid.String()
 
 		j.ID = jobID
@@ -252,47 +256,79 @@ func (q *Queue) GetJobByID(id string) (*Job, error) {
 	return job, err
 }
 
-func (q *Queue) Status() (QueueStatus) {
+func (q *Queue) Status() QueueStatus {
 
+	err := q.db.View(func(tx *bolt.Tx) error {
 
+		b := tx.Bucket([]byte(jobsBucketName))
 
-	err := q.db.View(func(tx *bolt.Tx) error { 
-    	
-    		b := tx.Bucket([]byte(jobsBucketName))
+		queue_status.Waiting = 0
 
-            queue_status.Waiting=0
- 
-        	b.ForEach(func(k, v []byte) error {
-        		queue_status.Waiting++
-        		return nil
-        	})
-        	
-            c := tx.Bucket([]byte(completedJobsBucketName))
+		b.ForEach(func(k, v []byte) error {
+			queue_status.Waiting++
+			return nil
+		})
 
-            queue_status.Completed=0
-            
-        	c.ForEach(func(k, v []byte) error {
-        		queue_status.Completed++
-        		return nil
-        	})
-        	
-        	return nil
-        	
-        	
-    })
-    
-    
-    if(err!=nil){}
-    
-    if(queue_status.Waiting>0) {
-    
-    queue_status.Waiting = queue_status.Waiting - queue_status.InProgress
-    
-    }
-    
-    
-    return queue_status 
-	
+		c := tx.Bucket([]byte(completedJobsBucketName))
+
+		queue_status.Completed = 0
+
+		c.ForEach(func(k, v []byte) error {
+			queue_status.Completed++
+			return nil
+		})
+
+		return nil
+
+	})
+
+	if err != nil {
+	}
+
+	if queue_status.Waiting > 0 {
+
+		queue_status.Waiting = queue_status.Waiting - queue_status.InProgress
+
+	}
+
+	return queue_status
+
+}
+
+func (q *Queue) All(getall bool) []QueueRow {
+
+	var all []QueueRow
+
+	err := q.db.View(func(tx *bolt.Tx) error {
+
+		b := tx.Bucket([]byte(jobsBucketName))
+
+		b.ForEach(func(k, v []byte) error {
+
+			all = append(all, QueueRow{jobsBucketName, DecodeJob(v)})
+
+			return nil
+		})
+
+		if getall == true {
+
+			c := tx.Bucket([]byte(completedJobsBucketName))
+
+			c.ForEach(func(k, v []byte) error {
+
+				all = append(all, QueueRow{completedJobsBucketName, DecodeJob(v)})
+
+				return nil
+			})
+
+		}
+
+		return nil
+
+	})
+
+	return all
+
 }
 
 func (q *Queue) getJobInBucketByID(id string, bucketName string) (*Job, error) {
@@ -389,7 +425,6 @@ func (q *Queue) resumeUnackedJobs() error {
 func stringToByteArray(s string) []byte {
 	return []byte(s)
 }
-
 
 //stringToByteArray small helper function for dealing with bucket record IDs
 func intToByteArray(i uint64) []byte {
