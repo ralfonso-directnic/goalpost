@@ -1,10 +1,9 @@
 module github.com/ralfonso-directnic/goalpost
 
-go 1.13
+go 1.16
 
 require (
-	github.com/rs/xid v1.2.1
-	github.com/stretchr/testify v1.4.0
-	go.etcd.io/bbolt v1.3.3
-	golang.org/x/sys v0.0.0-20191005200804-aed5e4c7ecf9 // indirect
+	github.com/rs/xid v1.3.0
+	github.com/stretchr/testify v1.7.0
+	go.etcd.io/bbolt v1.3.5
 )
